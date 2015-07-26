@@ -1,0 +1,126 @@
+---
+title: "Machine Learning Project"
+author: "Richard Verbrugge"
+date: "Sunday, July 26, 2015"
+output: html_document
+---
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+library(RCurl)
+```
+
+### Introduction
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. In this project, we will use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. The goal is to predict the manner in which they did the exercise. We will be using the classe variable in the training set and a number of other variables as predictors to build a model with. Cross validation will be used to test the model on an independent training set and to predict the out-of-sample error rate.
+
+The data for this exercise is available at :
+
+* Training :  https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+* Test      : https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The project is split in the following sections :
+* Reading the data and loading the required packages
+* some exploratory analysis and data cleaning
+* creating the model through random forests
+* testing the model
+* conclusions
+
+### Reading the data, loading packages, and splitting the data in training and test
+
+The data is downloaded and stored in the working directory from which it is read. Some exploratory analysis was done in excell and unix (using grep) to see what needs to be defined as NA values.
+
+For training and test purposes 60% of the data is used for training.
+
+
+```{r}
+
+library(caret)
+library(randomForest)
+set.seed(4428)
+downloadCSVAndLoadTable <- function(fileURL, filename, dir, header = FALSE, skip=0) {
+  dir
+  filename
+  if (file.exists(filename) == FALSE) {
+    download.file(fileURL, destfile = filename, method="auto")
+  }  
+  
+  read.csv(paste(c(dir, "/", filename), collapse=''), sep=",", header = header, skip=skip, na.strings=c("NA","#DIV/0!",""))
+}  
+```
+
+
+
+
+```{r}
+testing_file_coursera <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+training_file_coursera <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+training_file_local <- "pml-training.csv"
+testing_file_local <- "pml-testing.csv"
+training_data<-downloadCSVAndLoadTable(training_file_coursera, training_file_local, 
+                                  dir=getwd(), header=TRUE)
+testing_data <- downloadCSVAndLoadTable(testing_file_coursera, testing_file_local, 
+                                  dir=getwd(),header=TRUE)
+```
+
+
+
+```{r}
+# Split data set to training and test set
+inTrain = createDataPartition(y=training_data$classe, p=0.6, list=FALSE)
+training = training_data[inTrain,]
+testing = training_data[-inTrain,]
+```
+
+
+### Exploratoration and cleaning of data
+
+Exploration of the data learns that there are columns with numerous NA values and the first 7 columns do not contain data that is related to activity measurement. 
+
+Columns with the most missing values are removed and the columns that do ot contain activity data as well. To determine what a good value is whether to remove NA values a count is done after which it was decided to take 11000 as the amount above which the column will be removed.
+
+The new dataset contains 53 columns 
+
+there are 5 levels for the variable to be predicted which are A, B, C, D, E
+
+
+```{r}
+# Calculate columns with the most missing values in them and remove those columns from the data set
+count_na = sapply(training, function(x) {sum(is.na(x))})
+table(count_na)
+remove_cols <- training[,colSums(is.na(training_data)) >= 11000]
+training <- training[, !names(training) %in% names(remove_cols)]
+training <- training[, -c(1:7)]
+dim(training)
+str(training)
+levels(training$classe)
+```
+
+
+### Building the model and testing it against the test data
+
+A prediction model is build on the training data using the randomForest method and is test against the test dataset. A confusion matrix and overall statistics are produced.
+
+```{r}
+model <- randomForest(classe~., data=training)
+prediction <- predict(model,testing)
+cm <- confusionMatrix(prediction, testing$classe)
+cm
+```
+
+The overall quality of the model seems to work quite well on the test data with and overall accuracy of 99.43%. The accuracy whithin each class is very close to the overall avarage. It means an avarage out of sample error rate of 0.57% which is low. The specifity has a simular value. The overall conclusion is that the model created if of high quality.
+
+### Conclusion
+
+The machine algolrithm build has a high level of predictability with a high value for accuracy, and as a consequnce a very low value for the out of sample error rate. the values are :
+
+* Accuracy : 99.27 %
+* out of sample error rate 0,73% 
+
+A visual inspection of the other statistics do not raise any concerns around specifity or confidence intervals.
+
+
